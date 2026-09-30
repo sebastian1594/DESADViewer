@@ -275,8 +275,6 @@ export interface FoundNumber {
   /** Herkunft in Worten, z. B. „PIA · Artikelnummer des Käufers (IN)“ */
   source: string;
   segmentIndex: number;
-  /** true = über ein Muster aus numberRules.ts gefunden, false = Standardregel */
-  byPattern: boolean;
 }
 
 export interface LineItem {
@@ -304,9 +302,9 @@ export interface LineItem {
   despatchQuantity?: Quantity;
   batchNumbers: string[];
   orderReference?: { number: string; line?: string };
-  /** Materialnummer nach NUMBER_RULES (sonst Nummer aus LIN) */
+  /** Materialnummer: Artikelnummer des Käufers (IN/BP, siehe SUMMARY_RULES), sonst Nummer aus LIN */
   materialNumber?: FoundNumber;
-  /** Bestellnummer nach NUMBER_RULES (sonst RFF+ON) */
+  /** Bestellnummer: RFF+ON der Position, sonst im Kopf, sonst bei den Beteiligten */
   orderNumber?: FoundNumber;
   segmentIndex: number;
 }

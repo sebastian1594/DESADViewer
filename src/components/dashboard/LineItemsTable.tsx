@@ -99,9 +99,8 @@ function ItemRow({ item }: { item: LineItem }) {
             <div>
               <strong className="mono">{item.materialNumber.value}</strong> <SegLink index={item.materialNumber.segmentIndex} />
             </div>
-            <div className="small found-in" title={item.materialNumber.byPattern ? 'Über das Muster in src/knowledge/numberRules.ts gefunden' : 'Standardregel: Nummer aus LIN'}>
+            <div className="small found-in" title="Materialnr. = Artikelnummer des Käufers (IN/BP), sonst Hauptnummer aus LIN">
               gefunden in {item.materialNumber.source}
-              {item.materialNumber.byPattern && ' · per Muster'}
             </div>
           </>
         ) : (
@@ -163,10 +162,7 @@ function ItemRow({ item }: { item: LineItem }) {
           <>
             <span className="mono">{item.orderNumber.value}</span>
             {item.orderNumber.line && <span className="muted"> / {item.orderNumber.line}</span>} <SegLink index={item.orderNumber.segmentIndex} />
-            <div className="small found-in">
-              gefunden in {item.orderNumber.source}
-              {item.orderNumber.byPattern && ' · per Muster'}
-            </div>
+            <div className="small found-in">gefunden in {item.orderNumber.source}</div>
           </>
         ) : (
           <span className="muted">–</span>

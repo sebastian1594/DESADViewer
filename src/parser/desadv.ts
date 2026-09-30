@@ -12,7 +12,7 @@
  *
  * Bedeutungen (Klartext) kommen ausschließlich aus src/knowledge.
  */
-import { NUMBER_RULES, SUMMARY_RULES, codeListName, describeCode, describeCodeWithAgency, describeVersion, isKnownSegment, matchesAny } from '../knowledge';
+import { SUMMARY_RULES, codeListName, describeCode, describeCodeWithAgency, describeVersion, isKnownSegment } from '../knowledge';
 import { formatEdiDate } from './dates';
 import type { MessageEnvelope } from './envelope';
 import type {
@@ -684,44 +684,40 @@ function outerReferences(m: DesadvMessage): OuterRef[] {
   ];
 }
 
+/** true, wenn die Referenz laut Qualifier eine Bestellnummer ist (SUMMARY_RULES.orderReference, z. B. ON) */
+function isOrderReference(ref: ReferenceEntry): boolean {
+  return ref.qualifier !== undefined && SUMMARY_RULES.orderReference.includes(ref.qualifier.code) && ref.value !== '';
+}
+
 /**
- * Sucht Material- und Bestellnummer einer Position nach den Mustern in numberRules.ts.
- * Ohne Treffer gilt die Standardregel (LIN-Nummer bzw. RFF+ON).
+ * Bestimmt Material- und Bestellnummer einer Position – allein über die EDIFACT-Qualifier,
+ * unabhängig vom Nummernformat einer bestimmten Firma:
+ *  - Materialnr.: Artikelnummer mit Art IN/BP (SUMMARY_RULES.materialNumberTypes) aus LIN oder PIA,
+ *                 sonst die Hauptnummer aus LIN
+ *  - Bestellnr.:  RFF+ON der Position, sonst im Nachrichtenkopf, sonst bei den Beteiligten (NAD-Gruppe)
  */
 function findNumbers(item: LineItem, outerRefs: OuterRef[]): void {
-  // Materialnummer: LIN und PIA
-  const materialCandidates: FoundNumber[] = [];
+  const materialCandidates: (FoundNumber & { type?: string })[] = [];
   if (item.itemNumber) {
-    materialCandidates.push({ value: item.itemNumber, source: `LIN · ${kindText(item.itemNumberType)}`, segmentIndex: item.segmentIndex, byPattern: false });
+    materialCandidates.push({ value: item.itemNumber, type: item.itemNumberType?.code, source: `LIN · ${kindText(item.itemNumberType)}`, segmentIndex: item.segmentIndex });
   }
   for (const a of item.additionalIds) {
-    materialCandidates.push({ value: a.id, source: `PIA · ${kindText(a.type)}`, segmentIndex: a.segmentIndex, byPattern: false });
+    materialCandidates.push({ value: a.id, type: a.type?.code, source: `PIA · ${kindText(a.type)}`, segmentIndex: a.segmentIndex });
   }
-  const material = materialCandidates.find((c) => matchesAny(c.value, NUMBER_RULES.materialNumber));
-  item.materialNumber = material ? { ...material, byPattern: true } : materialCandidates[0];
+  const byType = findByPriority(materialCandidates, SUMMARY_RULES.materialNumberTypes, (c) => c.type);
+  const material = byType ?? materialCandidates[0];
+  if (material) item.materialNumber = { value: material.value, source: material.source, segmentIndex: material.segmentIndex };
 
-  // Bestellnummer: RFF der Position, dann RFF im Kopf und bei den Beteiligten
-  const toCandidate = (r: ReferenceEntry, where?: string): FoundNumber => ({
+  const toFound = (r: ReferenceEntry, where?: string): FoundNumber => ({
     value: r.value,
     line: r.lineNumber,
     source: `RFF${where ? ` ${where}` : ''} · ${kindText(r.qualifier)}`,
     segmentIndex: r.segmentIndex,
-    byPattern: false,
   });
-  const refCandidates: FoundNumber[] = [
-    ...item.references.map((r) => toCandidate(r)),
-    ...outerRefs.map((o) => toCandidate(o.ref, o.where)),
-  ];
-  const byPattern = refCandidates.find((c) => c.value && matchesAny(c.value, NUMBER_RULES.orderNumber));
-  if (byPattern) {
-    item.orderNumber = { ...byPattern, byPattern: true };
-    return;
-  }
-  const isOrderRef = (r: ReferenceEntry) => r.qualifier !== undefined && SUMMARY_RULES.orderReference.includes(r.qualifier.code);
-  const lineOrder = item.references.find(isOrderRef);
-  const outerOrder = outerRefs.find((o) => isOrderRef(o.ref));
-  if (lineOrder) item.orderNumber = toCandidate(lineOrder);
-  else if (outerOrder) item.orderNumber = toCandidate(outerOrder.ref, outerOrder.where);
+  const lineOrder = item.references.find(isOrderReference);
+  const outerOrder = outerRefs.find((o) => isOrderReference(o.ref));
+  if (lineOrder) item.orderNumber = toFound(lineOrder);
+  else if (outerOrder) item.orderNumber = toFound(outerOrder.ref, outerOrder.where);
 }
 
 function findByPriority<T>(items: T[], codes: string[], getCode: (t: T) => string | undefined): T | undefined {
@@ -740,13 +736,10 @@ function buildSummary(m: DesadvMessage): Summary {
     return p ? m.parties.indexOf(p) : undefined;
   };
 
-  // Bestellnummern: zuerst alles, was zu den eigenen Mustern passt, dann RFF+ON
-  const orderNumbers = new Set<string>();
+  // Bestellnummern: alle RFF+ON – im Kopf, bei den Beteiligten und bei den Positionen
   const outerRefs = outerReferences(m).map((o) => o.ref);
   const allRefs = [...outerRefs, ...m.lineItems.flatMap((i) => i.references)];
-  for (const ref of allRefs) if (ref.value && matchesAny(ref.value, NUMBER_RULES.orderNumber)) orderNumbers.add(ref.value);
-  for (const ref of outerRefs) if (ref.qualifier && r.orderReference.includes(ref.qualifier.code) && ref.value) orderNumbers.add(ref.value);
-  for (const item of m.lineItems) if (item.orderReference?.number) orderNumbers.add(item.orderReference.number);
+  const orderNumbers = new Set(allRefs.filter(isOrderReference).map((ref) => ref.value));
 
   // Packstücke je Packmittel zählen
   const packageCounts = new Map<string, Summary['packageCounts'][number]>();
@@ -776,10 +769,8 @@ function buildSummary(m: DesadvMessage): Summary {
   const documentDate = findByPriority(m.dates, r.documentDate, dateCode);
   const despatchDate = findByPriority(m.dates, r.despatchDate, dateCode);
   const arrivalDate = findByPriority(m.dates, r.arrivalDate, dateCode);
-  // Bestelldatum: DTM 4 im Kopf, sonst Datum unter einer Bestellnummer (RFF+ON bzw. 32er-Muster)
-  const isOrderRef = (ref: ReferenceEntry) =>
-    (ref.qualifier !== undefined && r.orderReference.includes(ref.qualifier.code)) || (ref.value !== '' && matchesAny(ref.value, NUMBER_RULES.orderNumber));
-  const orderRefDates = allRefs.filter(isOrderRef).flatMap((ref) => ref.dates);
+  // Bestelldatum: DTM 4 im Kopf, sonst Datum direkt unter einer Bestellnummer (RFF+ON → DTM)
+  const orderRefDates = allRefs.filter(isOrderReference).flatMap((ref) => ref.dates);
   const orderDate = findByPriority(m.dates, r.orderDate, dateCode) ?? findByPriority(orderRefDates, r.orderReferenceDate, dateCode);
   const used = new Set([documentDate, despatchDate, arrivalDate, orderDate]);
 

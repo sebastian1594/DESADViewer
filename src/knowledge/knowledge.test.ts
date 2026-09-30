@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CODE_LISTS, NUMBER_RULES, SEGMENTS, compareDirectories, describeCode, describeSubset, describeVersion, matchesAny } from './index';
+import { CODE_LISTS, SEGMENTS, compareDirectories, describeCode, describeSubset, describeVersion } from './index';
 import type { CodeListRegistry } from './types';
 
 describe('describeCode', () => {
@@ -53,27 +53,6 @@ describe('Versionen', () => {
     expect(describeSubset('GAVF24')).toMatchObject({ known: true });
     expect(describeSubset('EAN010')).toMatchObject({ known: true, name: 'EANCOM (GS1)' });
     expect(describeSubset('XYZ1')).toEqual({ code: 'XYZ1', known: false });
-  });
-});
-
-describe('Nummern-Muster', () => {
-  it.each([
-    ['320045678', true],
-    ['3201234567', true],
-    ['32012345', false], // 8 Stellen
-    ['32012345678', false], // 11 Stellen
-    ['4500012345', false],
-    ['32A1234567', false],
-  ])('Bestellnr. %s → %s', (value, expected) => {
-    expect(matchesAny(value, NUMBER_RULES.orderNumber)).toBe(expected);
-  });
-
-  it.each([
-    ['A2V00001234567', true],
-    ['a2v123', true],
-    ['XA2V1', false],
-  ])('Materialnr. %s → %s', (value, expected) => {
-    expect(matchesAny(value, NUMBER_RULES.materialNumber)).toBe(expected);
   });
 });
 

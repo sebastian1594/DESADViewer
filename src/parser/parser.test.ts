@@ -298,72 +298,81 @@ describe('Beispiel 06 – zwei Nachrichten in unterschiedlichen Versionen', () =
   });
 });
 
-/** Erfundene Mini-Nachricht: A2V-Nummer steht in PIA (nicht in LIN), Bestellnummern 9- und 10-stellig */
-const A2V_32_TESTDATEN = [
+/** Erfundene Mini-Nachricht: Artikelnummer des Käufers (IN) steht in PIA, in LIN steht die des Lieferanten */
+const KAEUFER_NUMMERN_TESTDATEN = [
   'UNH+1+DESADV:D:07A:UN',
   'BGM+351+LS-1+9',
-  'RFF+ON:320045678',
+  'RFF+ON:PO-77001',
   'NAD+SU+L1::92++Lieferant',
   'CPS+1',
-  'LIN+1++BPT-5520:SA',
-  'PIA+1+A2V00001234567:IN',
+  'LIN+1++LF-5520:SA',
+  'PIA+1+KD-100200-01:IN',
   'QTY+12:200:PCE',
-  'RFF+ON:320045678:10',
-  'LIN+2++BPT-7781:SA',
-  'PIA+1+A2V00009876543:IN',
+  'RFF+ON:PO-77001:10',
+  'LIN+2++LF-7781:SA',
+  'PIA+1+KD-100200-02:IN+X-99:EC',
   'QTY+12:200:PCE',
-  'RFF+ON:3201234567:20',
+  'RFF+ON:PO-77002:20',
   'UNT+14+1',
 ].join("'\n") + "'";
 
-describe('Eigene Muster – Materialnr. A2V… und Bestellnr. 32…', () => {
-  const r = parseEdifact(A2V_32_TESTDATEN);
+describe('Material- und Bestellnummer nach EDIFACT-Qualifiern', () => {
+  const r = parseEdifact(KAEUFER_NUMMERN_TESTDATEN);
   const m = r.messages[0];
 
   it('ist ohne Warnungen und Fehler', () => {
     expect(problems(r)).toEqual([]);
   });
 
-  it('findet die A2V-Materialnummer in PIA, obwohl in LIN eine andere Nummer steht', () => {
-    expect(m.lineItems[0].itemNumber).toBe('BPT-5520');
-    expect(m.lineItems[0].materialNumber).toMatchObject({
-      value: 'A2V00001234567',
+  it('nimmt die Artikelnummer des Käufers (IN) aus PIA, obwohl in LIN die des Lieferanten steht', () => {
+    expect(m.lineItems[0].itemNumber).toBe('LF-5520');
+    expect(m.lineItems[0].materialNumber).toEqual({
+      value: 'KD-100200-01',
       source: 'PIA · Artikelnummer des Käufers (IN)',
-      byPattern: true,
+      segmentIndex: 6,
     });
-    expect(r.segments[m.lineItems[0].materialNumber!.segmentIndex].tag).toBe('PIA');
+    expect(m.lineItems[1].materialNumber?.value).toBe('KD-100200-02');
   });
 
-  it('findet 9- und 10-stellige Bestellnummern mit 32 samt Bestellposition', () => {
-    expect(m.lineItems[0].orderNumber).toMatchObject({ value: '320045678', line: '10', byPattern: true });
-    expect(m.lineItems[1].orderNumber).toMatchObject({ value: '3201234567', line: '20', byPattern: true });
-    expect(m.summary.orderNumbers).toEqual(['320045678', '3201234567']);
+  it('nimmt die Bestellnummer (RFF+ON) der Position samt Bestellposition – egal welches Format', () => {
+    expect(m.lineItems[0].orderNumber).toMatchObject({ value: 'PO-77001', line: '10' });
+    expect(m.lineItems[1].orderNumber).toMatchObject({ value: 'PO-77002', line: '20' });
+    expect(m.summary.orderNumbers).toEqual(['PO-77001', 'PO-77002']);
   });
 
-  it('nimmt die Standardregel, wenn kein Muster passt', () => {
+  it('nimmt die Hauptnummer aus LIN, wenn es keine Käufer-Artikelnummer gibt', () => {
     const m1 = parseEdifact(sample1).messages[0];
-    expect(m1.lineItems[0].materialNumber).toMatchObject({ value: '9521234111115', source: 'LIN · GTIN (GS1-Artikelnummer) (SRV)', byPattern: false });
-    expect(m1.lineItems[0].orderNumber).toMatchObject({ value: '4500012345', line: '10', byPattern: false });
+    expect(m1.lineItems[0].materialNumber).toMatchObject({ value: '9521234111115', source: 'LIN · GTIN (GS1-Artikelnummer) (SRV)' });
+    expect(m1.lineItems[0].orderNumber).toMatchObject({ value: '4500012345', line: '10' });
+  });
+
+  it('nimmt eine Teilenummer des Käufers (BP), wenn es keine IN gibt', () => {
+    const r4 = parseEdifact("UNH+1+DESADV:D:96A:UN'BGM+351+X+9'LIN+1++LF-1:SA'PIA+1+TN-4711:BP'QTY+12:1:PCE'UNT+6+1'");
+    expect(r4.messages[0].lineItems[0].materialNumber?.value).toBe('TN-4711');
   });
 
   it('findet die Bestellnummer auch im RFF beim Käufer (NAD BY)', () => {
     const r3 = parseEdifact(
-      "UNH+1+DESADV:D:07A:UN'BGM+351+X+9'NAD+BY+K1::92++Kunde AG'RFF+ON:3299999901'NAD+SU+L1::92++Lieferant'CPS+1'LIN+1++A2V999:IN'QTY+12:5:PCE'UNT+9+1'",
+      "UNH+1+DESADV:D:07A:UN'BGM+351+X+9'NAD+BY+K1::92++Kunde AG'RFF+ON:4500099901'NAD+SU+L1::92++Lieferant'CPS+1'LIN+1++KD-1:IN'QTY+12:5:PCE'UNT+9+1'",
     );
     const m3 = r3.messages[0];
     expect(problems(r3)).toEqual([]);
-    expect(m3.parties[0].references[0].value).toBe('3299999901');
-    expect(m3.summary.orderNumbers).toEqual(['3299999901']);
+    expect(m3.summary.orderNumbers).toEqual(['4500099901']);
     expect(m3.lineItems[0].orderNumber).toMatchObject({
-      value: '3299999901',
-      byPattern: true,
+      value: '4500099901',
       source: 'RFF bei Käufer (NAD BY) · Bestellnummer (Käufer) (ON)',
     });
   });
 
+  it('nimmt andere Referenzarten nicht als Bestellnummer', () => {
+    const r5 = parseEdifact("UNH+1+DESADV:D:96A:UN'BGM+351+X+9'RFF+AAN:LAB-1'LIN+1++KD-1:IN'QTY+12:1:PCE'UNT+6+1'");
+    expect(r5.messages[0].lineItems[0].orderNumber).toBeUndefined();
+    expect(r5.messages[0].summary.orderNumbers).toEqual([]);
+  });
+
   it('ermittelt das Bestelldatum aus DTM 4 oder aus DTM 171 unter der Bestellnummer', () => {
     const viaRef = parseEdifact(
-      "UNH+1+DESADV:D:07A:UN'BGM+351+X+9'DTM+137:20250310:102'NAD+BY+K1::92++Kunde'RFF+ON:3299999901'DTM+171:20250201:102'LIN+1++A:IN'QTY+12:1:PCE'UNT+9+1'",
+      "UNH+1+DESADV:D:07A:UN'BGM+351+X+9'DTM+137:20250310:102'NAD+BY+K1::92++Kunde'RFF+ON:4500099901'DTM+171:20250201:102'LIN+1++A:IN'QTY+12:1:PCE'UNT+9+1'",
     ).messages[0].summary;
     expect(viaRef.orderDate?.formatted.display).toBe('01.02.2025');
     expect(viaRef.documentDate?.formatted.display).toBe('10.03.2025');
@@ -380,12 +389,11 @@ describe('Eigene Muster – Materialnr. A2V… und Bestellnr. 32…', () => {
   });
 
   it('sucht die Bestellnummer auch im Nachrichtenkopf', () => {
-    const r2 = parseEdifact("UNH+1+DESADV:D:96A:UN'BGM+351+X+9'RFF+CO:3298765432'LIN+1++A2V123:IN'QTY+12:1:PCE'UNT+6+1'");
-    expect(r2.messages[0].lineItems[0].orderNumber).toMatchObject({ value: '3298765432', byPattern: true, source: expect.stringContaining('Nachrichtenkopf') });
-    expect(r2.messages[0].lineItems[0].materialNumber).toMatchObject({ value: 'A2V123', byPattern: true });
+    const r2 = parseEdifact("UNH+1+DESADV:D:96A:UN'BGM+351+X+9'RFF+ON:4500765432'LIN+1++KD-123:IN'QTY+12:1:PCE'UNT+6+1'");
+    expect(r2.messages[0].lineItems[0].orderNumber).toMatchObject({ value: '4500765432', source: expect.stringContaining('Nachrichtenkopf') });
+    expect(r2.messages[0].lineItems[0].materialNumber).toMatchObject({ value: 'KD-123' });
   });
 });
-
 describe('Versionsunabhängigkeit', () => {
   const body = (version: string) =>
     `UNH+1+DESADV:${version}'BGM+351+LS1+9'NAD+SU+1::92++Lieferant'CPS+1'PAC+1++PX'LIN+1++A:IN'QTY+12:5:PCE'UNT+8+1'`;

@@ -7,7 +7,6 @@ export * from './types';
 export { CODE_LISTS } from './codelists';
 export { SEGMENTS } from './segments';
 export { SUMMARY_RULES } from './summaryRules';
-export { NUMBER_RULES, matchesAny } from './numberRules';
 export { describeVersion, describeSubset, compareDirectories } from './versions';
 
 /**

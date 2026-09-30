@@ -3,7 +3,7 @@
  * bei Beteiligten, Transport, Packstücken oder Positionen) – und fasst sie je Datumsart zusammen.
  * Grundlage für die Datumszeilen in der Übersicht.
  */
-import { NUMBER_RULES, SUMMARY_RULES, matchesAny } from '../knowledge';
+import { SUMMARY_RULES } from '../knowledge';
 import type { DateEntry, DesadvMessage, PackageNode, ReferenceEntry } from '../parser';
 
 export interface DateRow {
@@ -18,7 +18,7 @@ export interface DateRow {
 }
 
 function isOrderReference(ref: ReferenceEntry): boolean {
-  return (ref.qualifier !== undefined && SUMMARY_RULES.orderReference.includes(ref.qualifier.code)) || (ref.value !== '' && matchesAny(ref.value, NUMBER_RULES.orderNumber));
+  return ref.qualifier !== undefined && SUMMARY_RULES.orderReference.includes(ref.qualifier.code);
 }
 
 function displayOf(d: DateEntry): string {

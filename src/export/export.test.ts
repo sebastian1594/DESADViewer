@@ -38,14 +38,14 @@ describe('Tabellen', () => {
     expect(t.rows[1].batch).toBe('CH2403-A');
   });
 
-  it('übernimmt Material- und Bestellnummer nach den eigenen Mustern', () => {
+  it('übernimmt Material- und Bestellnummer nach den EDIFACT-Qualifiern', () => {
     const r7 = parseEdifact(
-      "UNH+1+DESADV:D:07A:UN'BGM+351+LS-1+9'LIN+1++BPT-5520:SA'PIA+1+A2V00001234567:IN'QTY+12:200:PCE'RFF+ON:320045678:10'" +
-        "LIN+2++BPT-7781:SA'PIA+1+A2V00009876543:IN'QTY+12:200:PCE'RFF+ON:3201234567:20'UNT+12+1'",
+      "UNH+1+DESADV:D:07A:UN'BGM+351+LS-1+9'LIN+1++LF-5520:SA'PIA+1+KD-100200-01:IN'QTY+12:200:PCE'RFF+ON:PO-77001:10'" +
+        "LIN+2++LF-7781:SA'PIA+1+KD-100200-02:IN'QTY+12:200:PCE'RFF+ON:PO-77002:20'UNT+12+1'",
     );
     const t = lineItemsTable(r7.messages[0]);
-    expect(t.rows[0]).toMatchObject({ materialNumber: 'A2V00001234567', itemNumber: 'BPT-5520', orderNumber: '320045678', orderLine: '10' });
-    expect(t.rows[1]).toMatchObject({ materialNumber: 'A2V00009876543', orderNumber: '3201234567', orderLine: '20' });
+    expect(t.rows[0]).toMatchObject({ materialNumber: 'KD-100200-01', itemNumber: 'LF-5520', orderNumber: 'PO-77001', orderLine: '10' });
+    expect(t.rows[1]).toMatchObject({ materialNumber: 'KD-100200-02', orderNumber: 'PO-77002', orderLine: '20' });
   });
 
   it('macht den Packbaum zu einer flachen Tabelle mit Pfad', () => {

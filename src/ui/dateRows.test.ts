@@ -9,8 +9,8 @@ describe('collectDateRows', () => {
   it('findet Datumsangaben im Kopf, unter Referenzen und bei Positionen', () => {
     const edi =
       "UNH+1+DESADV:D:10A:UN'BGM+351+X+9'DTM+124:20250305:102'RFF+AAN:LAB-1'DTM+137:20250306:102'" +
-      "RFF+ON:3299999901'DTM+171:20250201:102'LIN+1++A2V1:IN'QTY+12:1:PCE'DTM+2:20250310:102'" +
-      "LIN+2++A2V2:IN'QTY+12:1:PCE'DTM+2:20250311:102'LIN+3++A2V3:IN'QTY+12:1:PCE'DTM+2:20250310:102'UNT+18+1'";
+      "RFF+ON:4500099901'DTM+171:20250201:102'LIN+1++KD-1:IN'QTY+12:1:PCE'DTM+2:20250310:102'" +
+      "LIN+2++KD-2:IN'QTY+12:1:PCE'DTM+2:20250311:102'LIN+3++KD-3:IN'QTY+12:1:PCE'DTM+2:20250310:102'UNT+18+1'";
     expect(rowsOf(edi)).toEqual([
       ['Lieferscheindatum', '124', '05.03.2025'],
       ['Dokumentdatum', '137', '06.03.2025'],
