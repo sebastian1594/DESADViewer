@@ -1,0 +1,14 @@
+node_modules
+dist
+.vitest
+*.log
+.DS_Store
+
+# Persönliche Einstellungen und Projektnotizen für Claude – bleiben nur auf diesem Rechner
+.claude/settings.local.json
+CLAUDE.md
+README.md
+
+# Ordner für eigene, echte DESADV-Dateien zum Ausprobieren.
+# Wird NIE zu GitHub hochgeladen – echte Lieferavise enthalten Geschäftsdaten!
+privat/
